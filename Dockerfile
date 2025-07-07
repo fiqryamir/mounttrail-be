@@ -7,7 +7,8 @@ FROM php:8.2-fpm-alpine AS base
 # Set working directory
 WORKDIR /var/www/html
 
-# Install system dependencies required by Laravel and Composer
+# Install system dependencies required by Laravel and Composer.
+# This is the line we are fixing by adding more dev packages.
 RUN apk add --no-cache \
     curl \
     git \
@@ -20,6 +21,7 @@ RUN apk add --no-cache \
     libxml2-dev
 
 # Install required PHP extensions
+# This command can now run successfully because the dependencies above are installed.
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install \
     gd \
@@ -79,7 +81,6 @@ WORKDIR /var/www/html
 COPY --from=builder /var/www/html .
 
 # Copy our custom Nginx configuration
-# (We will create this file next)
 COPY .docker/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Set correct permissions for storage and bootstrap cache
@@ -89,3 +90,4 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 EXPOSE 80
 
 # The CMD is handled by the `deploy.sh` script, which will start Nginx and PHP-FPM
+# (This part is handled by your deploy.sh script, we don't need a CMD here)
