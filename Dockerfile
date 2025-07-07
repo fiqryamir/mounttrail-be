@@ -1,98 +1,86 @@
-# Dockerfile
-
-# ---- Base PHP Stage ----
-# Use an official PHP 8.2 FPM image. 'alpine' is a lightweight version.
+# ---- Base Stage ----
+# Contains PHP, its extensions, and Composer.
 FROM php:8.2-fpm-alpine AS base
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Install system dependencies required by Laravel and Composer.
-# build-base, autoconf: for compiling extensions from source.
-# postgresql-dev, mariadb-dev: for pdo_pgsql and pdo_mysql.
-# libzip-dev, zlib-dev: for the zip extension.
-# libpng-dev, libjpeg-turbo-dev, freetype-dev: for the gd extension.
-# oniguruma-dev: for mbstring.
+# Install system dependencies.
+# - Add linux-headers for the sockets extension.
+# - Add runtime dependencies like postgresql-libs, mariadb-connector-c-dev
 RUN apk add --no-cache \
     build-base autoconf \
     curl git unzip \
+    linux-headers \
     oniguruma-dev \
     libzip-dev zlib-dev \
     libpng-dev libjpeg-turbo-dev freetype-dev \
     postgresql-dev \
     mariadb-dev
 
-# Install base PHP extensions. The -j$(nproc) flag speeds up compilation.
+# Install PHP extensions
 RUN docker-php-ext-install -j$(nproc) \
-    mbstring \
-    pdo \
-    exif \
-    pcntl \
     bcmath \
-    sockets
+    exif \
+    mbstring \
+    pcntl \
+    pdo pdo_mysql pdo_pgsql \
+    sockets \
+    zip
 
-# Install database-specific extensions separately.
-RUN docker-php-ext-install -j$(nproc) pdo_mysql pdo_pgsql
-
-# Configure and install the GD extension separately.
+# Configure and install GD
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) gd
 
-# Configure and install the zip extension.
-RUN docker-php-ext-configure zip \
-    && docker-php-ext-install -j$(nproc) zip
-
-# Install Composer globally
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 
 # ---- Builder Stage ----
-# This stage builds our application dependencies
+# This stage builds application dependencies.
 FROM base AS builder
-
-# Copy only the dependency files to leverage Docker cache
-COPY composer.json composer.lock ./
-COPY package.json package-lock.json ./
-COPY vite.config.js ./
-COPY resources/ resources/
-
-# Install Composer dependencies
-RUN composer install --no-interaction --no-dev --no-scripts --prefer-dist
 
 # Install Node.js for building assets
 RUN apk add --no-cache nodejs npm
-RUN npm install
 
-# Copy the rest of the application
+# Copy dependency files and install
+COPY composer.json composer.lock ./
+RUN composer install --no-interaction --no-dev --no-scripts --prefer-dist
+
+COPY package.json package-lock.json vite.config.js ./
+COPY resources/ resources/
+RUN npm install && npm run build
+
+# Copy the rest of the application source
 COPY . .
 
-# Build frontend assets
-RUN npm run build
-
 # Generate Laravel caches
-RUN php artisan config:cache
-RUN php artisan route:cache
-RUN php artisan view:cache
-
-# Cleanup - remove dev files
-RUN rm -rf node_modules resources/js resources/css
+RUN php artisan config:cache && \
+    php artisan route:cache && \
+    php artisan view:cache
 
 
-# ---- Final Nginx Stage ----
-# This is the final image that will be run in production
-FROM nginx:1.25-alpine
+# ---- Final Stage ----
+# This is the final, optimized image that will be run.
+FROM base AS final
 
-# Set working directory
-WORKDIR /var/www/html
+# Install Nginx for the final stage
+RUN apk add --no-cache nginx
 
-# Copy the built application files from the builder stage
-COPY --from=builder /var/www/html .
+# Remove development packages to keep the image small
+RUN apk del build-base autoconf
 
-# Copy our custom Nginx configuration
+# Copy built application from the builder stage
+COPY --from=builder /var/www/html /var/www/html
+
+# Copy our custom Nginx configuration and entrypoint script
 COPY .docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY .docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Set correct permissions for storage and bootstrap cache
+# Set correct permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Expose port 80 for the web server
 EXPOSE 80
+
+# Run the entrypoint script
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
