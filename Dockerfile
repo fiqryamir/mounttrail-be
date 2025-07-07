@@ -42,22 +42,27 @@ FROM base AS builder
 # Install Node.js for building assets
 RUN apk add --no-cache nodejs npm
 
-# Copy dependency files and install
+# 1. Copy composer files and install PHP dependencies
+# This layer is cached as long as composer.json/lock don't change
 COPY composer.json composer.lock ./
 RUN composer install --no-interaction --no-dev --no-scripts --prefer-dist
 
-COPY package.json package-lock.json vite.config.js ./
-COPY resources/ resources/
-RUN npm install && npm run build
+# 2. Copy package files and install Node dependencies
+# This layer is cached as long as package.json/lock don't change
+COPY package.json package-lock.json ./
+RUN npm install
 
-# Copy the rest of the application source
+# 3. Copy the rest of the application files
+# This includes vite.config.js, tailwind.config.js, and the entire resources/ directory
 COPY . .
 
-# Generate Laravel caches
+# 4. Now, build the frontend assets with all files present
+RUN npm run build
+
+# 5. Generate Laravel caches
 RUN php artisan config:cache && \
     php artisan route:cache && \
     php artisan view:cache
-
 
 # ---- Final Stage ----
 # This is the final, optimized image that will be run.
