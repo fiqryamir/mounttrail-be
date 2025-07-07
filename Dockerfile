@@ -8,38 +8,46 @@ FROM php:8.2-fpm-alpine AS base
 WORKDIR /var/www/html
 
 # Install system dependencies required by Laravel and Composer.
-# This is the line we are fixing by adding more dev packages.
+# build-base, autoconf: for compiling extensions from source.
+# postgresql-dev, mariadb-dev: for pdo_pgsql and pdo_mysql.
+# libzip-dev, zlib-dev: for the zip extension.
+# libpng-dev, libjpeg-turbo-dev, freetype-dev: for the gd extension.
+# oniguruma-dev: for mbstring.
 RUN apk add --no-cache \
-    curl \
-    git \
-    unzip \
-    libzip-dev \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
+    build-base autoconf \
+    curl git unzip \
     oniguruma-dev \
-    libxml2-dev
+    libzip-dev zlib-dev \
+    libpng-dev libjpeg-turbo-dev freetype-dev \
+    postgresql-dev \
+    mariadb-dev
 
-# Install required PHP extensions
-# This command can now run successfully because the dependencies above are installed.
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install \
-    gd \
-    zip \
+# Install base PHP extensions. The -j$(nproc) flag speeds up compilation.
+RUN docker-php-ext-install -j$(nproc) \
+    mbstring \
     pdo \
-    pdo_mysql \
-    pdo_pgsql \
     exif \
     pcntl \
     bcmath \
     sockets
+
+# Install database-specific extensions separately.
+RUN docker-php-ext-install -j$(nproc) pdo_mysql pdo_pgsql
+
+# Configure and install the GD extension separately.
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) gd
+
+# Configure and install the zip extension.
+RUN docker-php-ext-configure zip \
+    && docker-php-ext-install -j$(nproc) zip
 
 # Install Composer globally
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 
 # ---- Builder Stage ----
-# This stage builds our dependencies
+# This stage builds our application dependencies
 FROM base AS builder
 
 # Copy only the dependency files to leverage Docker cache
@@ -71,7 +79,7 @@ RUN rm -rf node_modules resources/js resources/css
 
 
 # ---- Final Nginx Stage ----
-# This is the final image that will be run
+# This is the final image that will be run in production
 FROM nginx:1.25-alpine
 
 # Set working directory
@@ -88,6 +96,3 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 
 # Expose port 80 for the web server
 EXPOSE 80
-
-# The CMD is handled by the `deploy.sh` script, which will start Nginx and PHP-FPM
-# (This part is handled by your deploy.sh script, we don't need a CMD here)
