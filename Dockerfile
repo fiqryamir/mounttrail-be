@@ -2,8 +2,10 @@
 # This stage installs PHP, its extensions, and Composer
 FROM php:8.2-fpm-alpine AS base
 WORKDIR /var/www/html
-RUN apk add --no-cache curl git unzip libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev
-RUN docker-php-ext-install -j$(nproc) bcmath exif mbstring pdo pdo_mysql zip
+# --- FIX IS HERE: Added mariadb-dev and postgresql-dev for the database extensions ---
+RUN apk add --no-cache curl git unzip mariadb-dev postgresql-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev
+# --- FIX IS HERE: Added pdo_pgsql to match your original dependencies ---
+RUN docker-php-ext-install -j$(nproc) bcmath exif mbstring pdo pdo_mysql pdo_pgsql zip
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && docker-php-ext-install -j$(nproc) gd
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -13,7 +15,6 @@ FROM base AS builder
 COPY composer.json composer.lock ./
 RUN composer install --no-interaction --no-dev --prefer-dist
 COPY . .
-# We don't need to cache routes/views for artisan serve
 RUN composer dump-autoload --optimize
 
 # ---- Final Stage ----
