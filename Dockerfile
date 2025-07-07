@@ -68,7 +68,16 @@ COPY --from=builder /var/www/html /var/www/html
 # Copy our custom Nginx configuration and entrypoint script
 COPY .docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY .docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# ==============================================================================
+# --- FIX FILE FORMATTING ---
+# This step sanitizes the files copied from the host machine to remove any
+# Windows-style line endings (CRLF) or UTF-8 BOMs that can break Nginx/scripts.
+# This is the guaranteed fix for the "server directive not allowed" error.
+# ==============================================================================
+RUN sed -i 's/\r$//' /etc/nginx/conf.d/default.conf && \
+    sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh
 
 # Set correct permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
