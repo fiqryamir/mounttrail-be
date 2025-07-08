@@ -32,7 +32,12 @@ class AppServiceProvider extends ServiceProvider
             // which is fine for a platform like Render.
             Request::setTrustedProxies(
                 ['*'],
-                Request::HEADER_X_FORWARDED_ALL
+                // We explicitly list the headers instead of using the 'ALL' shortcut
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR |
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST |
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT |
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO |
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_TLS
             );
         }
 
