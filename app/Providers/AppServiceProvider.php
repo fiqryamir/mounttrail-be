@@ -21,26 +21,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        // --- ADD THE FOLLOWING CODE ---
-
-        // Check if the application is running in a production environment
-        // and force the URL to use HTTPS.
+        // On Render, the app is always in a 'production' like environment
         if ($this->app->environment('production')) {
+            // Force Laravel to always generate URLs with https
             URL::forceScheme('https');
 
-            // Set the trusted proxies to trust all proxies,
-            // which is fine for a platform like Render.
-            Request::setTrustedProxies(
-                ['*'],
-                // We explicitly list the headers instead of using the 'ALL' shortcut
+            // Tell Laravel to trust the headers from the proxy
+            // Using only the most common headers that exist in older Laravel versions
+            \Illuminate\Http\Request::setTrustedProxies(
+                ['*'], // Trust all proxies
                 \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR |
                 \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST |
                 \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT |
-                \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO |
-                \Illuminate\Http\Request::HEADER_X_FORWARDED_TLS
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO
             );
         }
-
-        // --- END OF ADDED CODE ---
     }
 }
