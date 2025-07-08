@@ -3,7 +3,20 @@
 FROM php:8.2-fpm-alpine AS base
 WORKDIR /var/www/html
 # Added tokenizer extension for full compatibility
-RUN apk add --no-cache nginx curl git unzip oniguruma-dev mariadb-dev postgresql-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev
+RUN apk add --no-cache \
+    nginx \
+    curl \
+    git \
+    unzip \
+    build-base \
+    bison \
+    oniguruma-dev \
+    mariadb-dev \
+    postgresql-dev \
+    libzip-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev
 RUN docker-php-ext-install -j$(nproc) bcmath exif mbstring pdo pdo_mysql pdo_pgsql zip tokenizer
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && docker-php-ext-install -j$(nproc) gd
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
