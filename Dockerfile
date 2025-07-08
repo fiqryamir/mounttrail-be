@@ -35,7 +35,6 @@ RUN composer install --no-interaction --no-dev --prefer-dist --optimize-autoload
 # -- FRONTEND BUILD STEPS HAVE BEEN REMOVED --
 
 # Optimize Laravel
-RUN php artisan optimize:clear
 RUN php artisan config:cache
 RUN php artisan route:cache
 
