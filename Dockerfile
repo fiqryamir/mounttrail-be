@@ -22,6 +22,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 FROM base AS builder
 COPY . .
 RUN composer install --no-interaction --no-dev --prefer-dist --optimize-autoloader
+
+RUN php artisan l5-swagger:publish
+
 RUN php artisan config:cache
 RUN php artisan route:cache
 
