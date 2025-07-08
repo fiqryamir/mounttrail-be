@@ -27,7 +27,7 @@
     <script>
         window.onload = function() {
             const ui = SwaggerUIBundle({
-                url: "{{ route('swagger.docs') }}",
+                url: "{{ secure_url(route('swagger.docs', [], false)) }}",
                 dom_id: '#swagger-ui',
                 deepLinking: true,
                 presets: [
