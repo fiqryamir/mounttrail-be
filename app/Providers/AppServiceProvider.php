@@ -21,20 +21,5 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        // On Render, the app is always in a 'production' like environment
-        if ($this->app->environment('production')) {
-            // Force Laravel to always generate URLs with https
-            URL::forceScheme('https');
-
-            // Tell Laravel to trust the headers from the proxy
-            // Using only the most common headers that exist in older Laravel versions
-            \Illuminate\Http\Request::setTrustedProxies(
-                ['*'], // Trust all proxies
-                \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR |
-                \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST |
-                \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT |
-                \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO
-            );
-        }
     }
 }

@@ -16,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Removed EnsureFrontendRequestsAreStateful to disable CSRF for API routes
         // This allows pure API token-based authentication without session/CSRF requirements
-        
+        $middleware->prepend(\App\Http\Middleware\TrustProxies::class);
         // Register Spatie Permission Middleware
         $middleware->alias([
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
