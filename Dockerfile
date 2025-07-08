@@ -8,8 +8,6 @@ RUN apk add --no-cache \
     curl \
     git \
     unzip \
-    build-base \
-    bison \
     oniguruma-dev \
     mariadb-dev \
     postgresql-dev \
@@ -17,7 +15,8 @@ RUN apk add --no-cache \
     libpng-dev \
     libjpeg-turbo-dev \
     freetype-dev
-RUN docker-php-ext-install -j$(nproc) bcmath exif mbstring pdo pdo_mysql pdo_pgsql zip tokenizer
+
+RUN docker-php-ext-install -j$(nproc) bcmath exif mbstring pdo pdo_mysql pdo_pgsql zip
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg && docker-php-ext-install -j$(nproc) gd
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
