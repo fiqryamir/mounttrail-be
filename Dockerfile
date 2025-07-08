@@ -23,7 +23,7 @@ FROM base AS builder
 COPY . .
 RUN composer install --no-interaction --no-dev --prefer-dist --optimize-autoloader
 
-RUN php artisan l5-swagger:publish
+RUN php artisan vendor:publish --provider="L5Swagger\L5SwaggerServiceProvider"
 
 RUN php artisan config:cache
 RUN php artisan route:cache
