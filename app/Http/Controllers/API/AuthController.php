@@ -7,6 +7,7 @@ use App\Models\User;
 use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB; 
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -65,28 +66,44 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        // The validation can happen outside the transaction, which is efficient.
         try {
-            $request->validate([
+            $validatedData = $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:8|confirmed',
-                'role' => 'sometimes|string|in:user,guide', // Optional, defaults to 'user'
+                'role' => 'sometimes|string|in:user,guide',
             ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
+        // V-- START OF THE TRANSACTIONAL BLOCK --V
+        DB::beginTransaction();
+        try {
+            // Create the user
             $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
+                'name' => $validatedData['name'],
+                'email' => $validatedData['email'],
+                'password' => Hash::make($validatedData['password']),
             ]);
 
-            // Assign role to user (default to 'user' if not specified)
+            // Assign role to user
             $role = $request->input('role', 'user');
             $user->assignRole($role);
 
+            // Create the token
             $token = $user->createToken('auth_token')->plainTextToken;
 
             // Load roles and permissions for response
             $user->load('roles', 'permissions');
+
+            // If everything above succeeded, commit the changes to the database
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -101,27 +118,20 @@ class AuthController extends Controller
                 ],
                 'message' => 'User registered successfully'
             ], 201);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (QueryException $e) {
-            Log::error('Database error during registration: ' . $e->getMessage());
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Registration failed due to database error',
-                'error' => 'Unable to create user account'
-            ], 500);
         } catch (Exception $e) {
-            Log::error('Unexpected error during registration: ' . $e->getMessage());
+            // V-- SOMETHING FAILED, ROLLBACK EVERYTHING --V
+            // This will undo the User::create() call.
+            DB::rollBack();
 
+            // Log the actual error for debugging
+            Log::error('Unexpected error during registration transaction: ' . $e->getMessage());
+
+            // Return a clean error to the frontend
             return response()->json([
                 'success' => false,
                 'message' => 'Registration failed',
-                'error' => 'An unexpected error occurred'
+                'error' => 'An unexpected server error occurred. Please try again.'
             ], 500);
         }
     }
